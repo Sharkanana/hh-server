@@ -12,7 +12,8 @@ const UserSchema = new mongoose.Schema({
     index: { unique: true }
   },
   password: String,
-  name: String
+  name: String,
+  refreshToken: String
 });
 
 

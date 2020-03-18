@@ -14,16 +14,11 @@ const router = new Router();
 function validateSignUpForm(payload) {
   const errors = validateBasicSignInSignUpForm(payload);
 
-  if (!payload || (typeof payload.name !== 'string') || !/^[a-zA-Z]+([\-\s]?[a-zA-Z]+)*$/.test(payload.name.trim())) {
-    errors.name = {
-      code: 'INVALID_NAME'
-    };
-  }
+
+  console.log(payload.password);
 
   if (!payload || typeof payload.password !== 'string' || payload.password.trim().length < 8) {
-    errors.password = {
-      code: 'INVALID_PASSWORD'
-    };
+    errors.push("Password must be 8 characters long.");
   }
 
   return errors;
@@ -40,27 +35,24 @@ function validateSignInForm(payload) {
   const errors = validateBasicSignInSignUpForm(payload);
 
   if (!payload || typeof payload.password !== 'string' || payload.password.trim().length === 0) {
-    errors.password = {
-      code: 'EMPTY_PASSWORD'
-    };
+    errors.push('Please enter a password.');
   }
 
   return errors;
 }
 
 function validateBasicSignInSignUpForm(payload) {
-  const errors = {};
+  const errors = [];
 
   if (!payload || typeof payload.email !== 'string' || !isEmail(payload.email.trim())) {
-    errors.email = {
-      code: 'INVALID_EMAIL'
-    };
+    errors.push("Email is invalid.");
   }
 
   return errors;
 }
 
 router.post('/register', (req, res, next) => {
+
   const validationErrors = validateSignUpForm(req.body);
 
   if (Object.keys(validationErrors).length > 0) {
@@ -69,12 +61,10 @@ router.post('/register', (req, res, next) => {
 
   return passport.authenticate('local-signup', (err) => {
     if (err) {
-      const { field, code } = err.name === 'MongoError' && err.code === 11000
-          ? { field: 'email', code: 'DUPLICATED_EMAIL' }
-          : { field: '', code: 'FORM_SUBMISSION_FAILED' };
+      let errMsg = err.name === 'MongoError' && err.code === 11000 ? 'Email already in use.' : 'Error registering.  Contact support.';
 
       return res.json({
-        errors: { [field]: { code } }
+        errors: [errMsg]
       });
     }
 
@@ -92,9 +82,7 @@ router.post('/login', (req, res, next) => {
   return passport.authenticate('local-login', (error, token, user) => {
     if (error !== null) {
       return res.json({
-        errors: {
-          [error.code === 'INCORRECT_CREDENTIALS' ? 'password' : '']: error
-        }
+        errors: [error.code === 'INCORRECT_CREDENTIALS' ? 'Invalid credentials.' : error.code]
       });
     }
 

@@ -23,8 +23,8 @@ const getStrategy = (User) => new PassportLocalStrategy({
     }
 
     done(null, sign({ sub: user._id }, jwtSecret), {
-      email: user.email,
-      name: user.name
+      id: user._id,
+      email: user.email
     });
   } catch (e) {
     console.error(e);

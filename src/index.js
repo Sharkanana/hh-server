@@ -8,6 +8,7 @@ import passport from 'passport';
 import config from './config';
 import connect from './server/models';
 import authRoutes from './server/routes/auth';
+import api from './server/routes/api';
 import authCheckMiddleware from './server/middleware/auth-check';
 import getLocalSignupStrategy from './server/passport/local-signup';
 import getLocalLoginStrategy from './server/passport/local-login';
@@ -26,6 +27,7 @@ passport.use('local-signup', getLocalSignupStrategy(User));
 passport.use('local-login', getLocalLoginStrategy(User));
 
 app.use('/api', authCheckMiddleware);
+app.use('/api', api);
 app.use('/auth', authRoutes);
 
 app.set('port', (process.env.PORT || 8000));

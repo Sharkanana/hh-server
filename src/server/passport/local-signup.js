@@ -8,8 +8,7 @@ const getStrategy = (User) => new PassportLocalStrategy({
 }, async (req, email, password, done) => {
   const newUser = new User({
     email: email.trim(),
-    password: password.trim(),
-    name: req.body.name.trim(),
+    password: password.trim()
   });
 
   try {
