@@ -111,7 +111,7 @@ router.post('/token', async (req, res, next) => {
 
   if(refreshMatched) {
 
-    const token = sign({ sub: userId }, jwtSecret, { expiresIn: '60000' });
+    const token = sign({ sub: userId }, jwtSecret);
 
     return res.json({
       token

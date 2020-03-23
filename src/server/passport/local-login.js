@@ -27,7 +27,7 @@ const getStrategy = (User) => new PassportLocalStrategy({
 
     await user.updateOne({refreshToken});
 
-    done(null, sign({ sub: user._id }, jwtSecret, { expiresIn: '60000' }), {
+    done(null, sign({ sub: user._id }, jwtSecret), {
       id: user._id,
       email: user.email,
       refreshToken: refreshToken
