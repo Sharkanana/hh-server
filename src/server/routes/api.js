@@ -1,10 +1,9 @@
+
+import glob from 'glob';
 import { Router } from 'express';
 
-const router = new Router();
-
-// simple test for login session
-router.get('/test', (req, res, next) => {
-  return res.json(true);
-});
-
-module.exports = router;
+module.exports = () => glob
+  .sync('**/*.js', { cwd: `${__dirname}/`, ignore: '**/auth.js' })
+  .map(filename => require(`./${filename}`))
+  .filter(router => Object.getPrototypeOf(router) === Router)
+  .reduce((rootRouter, router) => rootRouter.use(router), Router({ mergeParams: true }));
