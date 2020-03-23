@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import passport from 'passport';
+import mongoose from 'mongoose';
 import { isEmail } from 'validator';
+import {sign} from "jsonwebtoken";
+import {jwtSecret} from "../../config";
 
 const router = new Router();
 
@@ -13,9 +16,6 @@ const router = new Router();
  */
 function validateSignUpForm(payload) {
   const errors = validateBasicSignInSignUpForm(payload);
-
-
-  console.log(payload.password);
 
   if (!payload || typeof payload.password !== 'string' || payload.password.trim().length < 8) {
     errors.push("Password must be 8 characters long.");
@@ -51,6 +51,7 @@ function validateBasicSignInSignUpForm(payload) {
   return errors;
 }
 
+// Register api
 router.post('/register', (req, res, next) => {
 
   const validationErrors = validateSignUpForm(req.body);
@@ -72,6 +73,7 @@ router.post('/register', (req, res, next) => {
   })(req, res, next);
 });
 
+// Login api
 router.post('/login', (req, res, next) => {
   const validationErrors = validateSignInForm(req.body);
 
@@ -93,6 +95,31 @@ router.post('/login', (req, res, next) => {
       },
     });
   })(req, res, next);
+});
+
+// Refresh token api
+router.post('/token', async (req, res, next) => {
+
+  let userId = req.body.userId,
+    refreshToken = req.body.refreshToken;
+
+  //check if refresh token exists for user
+  const refreshMatched = await mongoose.model('User').find({
+    _id: userId,
+    refreshToken: refreshToken
+  });
+
+  if(refreshMatched) {
+
+    const token = sign({ sub: userId }, jwtSecret, { expiresIn: '60000' });
+
+    return res.json({
+      token
+    });
+  }
+  else {
+    res.send(401);
+  }
 });
 
 module.exports = router;

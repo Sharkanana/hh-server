@@ -1,7 +1,8 @@
 import { sign } from 'jsonwebtoken';
 import { Strategy as PassportLocalStrategy } from 'passport-local';
-
 import { jwtSecret } from '../../config';
+
+const randtoken = require('rand-token');
 
 const getStrategy = (User) => new PassportLocalStrategy({
   usernameField: 'email',
@@ -22,9 +23,14 @@ const getStrategy = (User) => new PassportLocalStrategy({
       return done({code: 'INCORRECT_CREDENTIALS'});
     }
 
-    done(null, sign({ sub: user._id }, jwtSecret), {
+    const refreshToken = randtoken.uid(256);
+
+    await user.updateOne({refreshToken});
+
+    done(null, sign({ sub: user._id }, jwtSecret, { expiresIn: '60000' }), {
       id: user._id,
-      email: user.email
+      email: user.email,
+      refreshToken: refreshToken
     });
   } catch (e) {
     console.error(e);
