@@ -1,7 +1,9 @@
 
 const { Router } = require('express');
 
-// save plan - persists a plan that has been init already
+/**
+ * Make changes to an existing plan
+ */
 module.exports = Router({mergeParams: true})
   .post('/savePlan', (req, res, next) => {
 
