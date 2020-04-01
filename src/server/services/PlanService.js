@@ -1,9 +1,14 @@
 import axios from 'axios';
 import config from '../../config';
+import { format } from 'date-fns';
+import { eachDayOfInterval } from 'date-fns';
+import mongoose from 'mongoose';
 
 const PlanService = {
 
   async createPlan(planConfig) {
+
+    this.planConfig = planConfig;
 
     let locationCoords, locationName;
 
@@ -18,72 +23,145 @@ const PlanService = {
       });
 
       locationName = results.data.result.name;
-      locationCoords = results.data.result.geometry.location;
-    }
-    catch(error) {
+      this.locationCoords = results.data.result.geometry.location;
+    } catch (err) {
       console.log('Error looking up geo of selected location, PlanService: initPlan:');
-      console.log(error);
+      console.log(err);
+
+      throw err;
     }
 
-    // lookup 5 b/l/d spots within 5 miles (8k meters) of location
+    //fetch possible restaurants
+    await this.getBreakfastOptions();
+    await this.getLunchOptions();
+    await this.getDinnerOptions();
 
-    let breakfastResults, lunchResults, dinnerResults;
-
-    try {
-
-      breakfastResults = await axios.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json', {
-        params: {
-          key: config.googleApiKey,
-          fields: 'name',
-          input: 'breakfast',
-          inputtype: 'textquery',
-          locationbias: `circle:8000@${locationCoords.lat},${locationCoords.lng}`
-        }
-      });
-
-      lunchResults = await axios.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json', {
-        params: {
-          key: config.googleApiKey,
-          fields: 'name',
-          input: 'lunch',
-          inputtype: 'textquery',
-          locationbias: `circle:8000@${locationCoords.lat},${locationCoords.lng}`
-        }
-      });
-
-      dinnerResults = await axios.get('https://maps.googleapis.com/maps/api/place/findplacefromtext/json', {
-        params: {
-          key: config.googleApiKey,
-          fields: 'name',
-          input: 'dinner',
-          inputtype: 'textquery',
-          locationbias: `circle:8000@${locationCoords.lat},${locationCoords.lng}`
-        }
-      });
-
-    }
-    catch(error) {
-      console.log('Error looking up b/l/d, PlanService: initPlan:');
-      console.log(error);
-    }
-
-    const itemFn = function(item) {
-      return {
-        name: item.name
-      };
+    //build new plan
+    const planObj = {
+      location: locationName,
+      lat: this.locationCoords.lat,
+      lng: this.locationCoords.lng,
+      startDate: planConfig.startDate,
+      endDate: planConfig.endDate,
+      name: planConfig.name,
+      days:  this.buildDays()
     };
 
-    // TODO: lets persist the plan next
+    //persist new plan
+    try {
+      const PlanModel = mongoose.model('Plan');
+      const newPlan = new PlanModel(planObj);
+
+      await newPlan.save();
+
+      return newPlan;
+
+    } catch (err) {
+      console.error('Error creating new plan:');
+      console.error(err);
+
+      throw err;
+    }
+  },
+
+  /**
+   * build up entire days structure for a new plan
+   */
+  buildDays() {
+
+    let cfg = this.planConfig,
+        days = [];
+
+    for(const date of eachDayOfInterval({ start: new Date(cfg.startDate), end: new Date(cfg.endDate)})) {
+      days.push(this.buildDay(date));
+    }
+
+    return days;
+  },
+
+  /**
+   * build a single day for a new plan
+   * @param date
+   */
+  buildDay(date) {
 
     return {
-      location: locationName,
-      b: breakfastResults.data.candidates.map(itemFn),
-      l: lunchResults.data.candidates.map(itemFn),
-      d: dinnerResults.data.candidates.map(itemFn)
+      date: format(date, 'yyyy-MM-dd'),
+      b: this.selectBreakfast(),
+      l: this.selectLunch(),
+      d: this.selectDinner()
     };
+  },
 
+  selectBreakfast() {
+    return this.breakfastOptions.shift().id;
+  },
+  selectLunch() {
+    return this.lunchOptions.shift().id;
+  },
+  selectDinner() {
+    return this.dinnerOptions.shift().id;
+  },
+
+  /**
+   * Fetch breakfast options for entire plan
+   */
+  async getBreakfastOptions() {
+
+    const results = await axios.get('https://api.yelp.com/v3/businesses/search', {
+      params: {
+        term: 'breakfast restaurants',
+        longitude: this.locationCoords.lng,
+        latitude: this.locationCoords.lat,
+        radius: 5000, // about 3 mile radius
+        sort_by: 'rating'
+      },
+      headers: {
+        Authorization: `Bearer ${config.yelpApiKey}`
+      }
+    });
+
+    this.breakfastOptions = results.data.businesses;
+  },
+
+  /**
+   * Fetch lunch options for entire plan
+   */
+  async getLunchOptions() {const results = await axios.get('https://api.yelp.com/v3/businesses/search', {
+    params: {
+      term: 'lunch restaurants',
+      longitude: this.locationCoords.lng,
+      latitude: this.locationCoords.lat,
+      radius: 5000, // about 3 mile radius
+      sort_by: 'rating'
+    },
+    headers: {
+      Authorization: `Bearer ${config.yelpApiKey}`
+    }
+  });
+
+    this.lunchOptions = results.data.businesses;
+  },
+
+  /**
+   * Fetch dinner options for entire plan
+   */
+  async getDinnerOptions() {
+    const results = await axios.get('https://api.yelp.com/v3/businesses/search', {
+      params: {
+        term: 'dinner restaurants',
+        longitude: this.locationCoords.lng,
+        latitude: this.locationCoords.lat,
+        radius: 5000, // about 3 mile radius
+        sort_by: 'rating'
+      },
+      headers: {
+        Authorization: `Bearer ${config.yelpApiKey}`
+      }
+    });
+
+    this.dinnerOptions = results.data.businesses;
   }
-
 };
 
 export default PlanService;

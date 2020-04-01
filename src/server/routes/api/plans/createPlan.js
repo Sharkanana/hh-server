@@ -10,14 +10,15 @@ module.exports = Router({mergeParams: true})
 
     try {
 
-      let placeId = req.body.place_id;
-
-      const results = await PlanService.createPlan({ place_id: placeId });
+      const results = await PlanService.createPlan(req.body.plan);
 
       return res.json(results);
 
     } catch(error) {
-      next(error);
+
+      console.log("Error with create plan:", error);
+
+      return res.status(400).json({error: 'Server error.'});
     }
 
   });

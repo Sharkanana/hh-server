@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import UserSchema from './schemas/user';
+import PlanSchema from "./schemas/plan";
 
 const connect = (uri) => {
   mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true });
@@ -13,6 +14,7 @@ const connect = (uri) => {
   });
 
   mongoose.model('User', UserSchema);
+  mongoose.model('Plan', PlanSchema);
 };
 
 export default connect;
