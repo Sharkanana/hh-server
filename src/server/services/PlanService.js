@@ -4,8 +4,42 @@ import { format } from 'date-fns';
 import { eachDayOfInterval } from 'date-fns';
 import mongoose from 'mongoose';
 
+const PlanModel = mongoose.model('Plan');
+const dateFormat = 'yyyy-MM-dd';
+
 const PlanService = {
 
+  /**
+   * Load a user's plans for display on the 'my plans' screen
+   */
+  async loadPlans(user) {
+
+    const plans = await PlanModel.find({
+      user: user
+    });
+
+    return plans.map(function(plan) {
+      return {
+        id: plan._id,
+        location: plan.location,
+        startDate: format(plan.startDate, dateFormat),
+        endDate: format(plan.startDate, dateFormat),
+        name: plan.name
+      }
+    });
+  },
+
+  /**
+   * Delete a plan
+   */
+  async deletePlan(planId) {
+    await PlanModel.deleteOne({ _id: planId });
+    return true;
+  },
+
+  /**
+   * Create a plan from the data gathered from plan form, and the user's profile
+   */
   async createPlan(planConfig) {
 
     this.planConfig = planConfig;
@@ -22,7 +56,7 @@ const PlanService = {
         }
       });
 
-      locationName = results.data.result.name;
+      locationName = results.data.result.formatted_address;
       this.locationCoords = results.data.result.geometry.location;
     } catch (err) {
       console.log('Error looking up geo of selected location, PlanService: initPlan:');
@@ -41,6 +75,7 @@ const PlanService = {
       location: locationName,
       lat: this.locationCoords.lat,
       lng: this.locationCoords.lng,
+      user: planConfig.user,
       startDate: planConfig.startDate,
       endDate: planConfig.endDate,
       name: planConfig.name,
@@ -49,7 +84,6 @@ const PlanService = {
 
     //persist new plan
     try {
-      const PlanModel = mongoose.model('Plan');
       const newPlan = new PlanModel(planObj);
 
       await newPlan.save();
@@ -86,7 +120,7 @@ const PlanService = {
   buildDay(date) {
 
     return {
-      date: format(date, 'yyyy-MM-dd'),
+      date: date,
       b: this.selectBreakfast(),
       l: this.selectLunch(),
       d: this.selectDinner()

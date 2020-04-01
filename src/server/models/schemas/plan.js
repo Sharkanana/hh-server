@@ -3,6 +3,10 @@ import { isArray } from 'lodash';
 
 // define the Plan model schema
 const PlanSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectID,
+    ref: 'User'
+  },
   location: String,
   lat: String,
   lng: String,
