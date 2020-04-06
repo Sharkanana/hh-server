@@ -30,6 +30,67 @@ const PlanService = {
   },
 
   /**
+   * Load restaurant details for a plan
+   */
+  async loadPlan(planId) {
+
+    let service = this,
+      gql = '{';
+
+    // load plan first
+    let plan = await PlanModel.findOne({
+      _id: planId
+    });
+
+    //loop to build gql
+    plan.days.forEach(function (day) {
+      gql += `${day.b}: business(id:"${day.b}"){...bizInfo}\n${day.l}:business(id:"${day.l}"){...bizInfo}\n${day.d}:business(id:"${day.d}"){...bizInfo}\n`;
+    });
+
+    gql += '} fragment bizInfo on Business { name\nrating\ncategories { title }\nreview_count}';
+
+    //fetch results
+
+    const response = await axios.post(`https://api.yelp.com/v3/graphql`, gql,
+      {
+        headers: {
+          Authorization: `Bearer ${config.yelpApiKey}`,
+          'Content-Type': 'application/graphql'
+        }
+      });
+    const results = response.data.data;
+
+    //loop to set results
+    plan.days = plan.days.map(function(day) {
+
+      return {
+        date: format(day.date, dateFormat),
+        b: service.buildDayResult(results[day.b]),
+        l: service.buildDayResult(results[day.l]),
+        d: service.buildDayResult(results[day.d])
+      };
+
+    });
+
+    return plan;
+  },
+
+  /**
+   * processing/formatting of day data
+   * @param day
+   */
+  buildDayResult(day) {
+
+    return {
+      ...day,
+      categories: day.categories.reduce((result, cat)=>{
+        return `${result}${cat.title}, `;
+      }, '').slice(0,-2)
+    };
+
+  },
+
+  /**
    * Delete a plan
    */
   async deletePlan(planId) {
@@ -104,7 +165,7 @@ const PlanService = {
   buildDays() {
 
     let cfg = this.planConfig,
-        days = [];
+      days = [];
 
     for(const date of eachDayOfInterval({ start: new Date(cfg.startDate), end: new Date(cfg.endDate)})) {
       days.push(this.buildDay(date));
