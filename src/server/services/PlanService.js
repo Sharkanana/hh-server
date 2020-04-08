@@ -1,11 +1,11 @@
 import axios from 'axios';
 import config from '../../config';
-import { format } from 'date-fns';
-import { eachDayOfInterval } from 'date-fns';
 import mongoose from 'mongoose';
+import moment from "moment";
 
 const PlanModel = mongoose.model('Plan');
-const dateFormat = 'yyyy-MM-dd';
+const displayDateFormat = 'MMM Do, YYYY(ddd)';
+const saveDateFormat = 'YYYY-MM-DD';
 
 const PlanService = {
 
@@ -19,11 +19,12 @@ const PlanService = {
     });
 
     return plans.map(function(plan) {
+
       return {
         id: plan._id,
         location: plan.location,
-        startDate: format(plan.startDate, dateFormat),
-        endDate: format(plan.startDate, dateFormat),
+        startDate: moment(plan.startDate).utc().format(displayDateFormat),
+        endDate: moment(plan.endDate).utc().format(displayDateFormat),
         name: plan.name
       }
     });
@@ -35,7 +36,9 @@ const PlanService = {
   async loadPlan(planId) {
 
     let service = this,
-      gql = '{';
+      gql = '{',
+      resultMap = {},
+      count = 0;
 
     // load plan first
     let plan = await PlanModel.findOne({
@@ -44,10 +47,15 @@ const PlanService = {
 
     //loop to build gql
     plan.days.forEach(function (day) {
-      gql += `${day.b}: business(id:"${day.b}"){...bizInfo}\n${day.l}:business(id:"${day.l}"){...bizInfo}\n${day.d}:business(id:"${day.d}"){...bizInfo}\n`;
+
+      resultMap[day.b] = `a${count++}`;
+      resultMap[day.l] = `a${count++}`;
+      resultMap[day.d] = `a${count++}`;
+
+      gql += `${resultMap[day.b]}: business(id:"${day.b}"){...bizInfo}\n${resultMap[day.l]}:business(id:"${day.l}"){...bizInfo}\n${resultMap[day.d]}:business(id:"${day.d}"){...bizInfo}\n`;
     });
 
-    gql += '} fragment bizInfo on Business { name\nrating\ncategories { title }\nreview_count}';
+    gql += '} fragment bizInfo on Business { name\nrating\ncategories { title }\nurl\nreview_count}';
 
     //fetch results
 
@@ -64,10 +72,10 @@ const PlanService = {
     plan.days = plan.days.map(function(day) {
 
       return {
-        date: format(day.date, dateFormat),
-        b: service.buildDayResult(results[day.b]),
-        l: service.buildDayResult(results[day.l]),
-        d: service.buildDayResult(results[day.d])
+        date: moment(day.date).utc().format(displayDateFormat),
+        b: service.buildDayResult(results[resultMap[day.b]]),
+        l: service.buildDayResult(results[resultMap[day.l]]),
+        d: service.buildDayResult(results[resultMap[day.d]])
       };
 
     });
@@ -167,8 +175,8 @@ const PlanService = {
     let cfg = this.planConfig,
       days = [];
 
-    for(const date of eachDayOfInterval({ start: new Date(cfg.startDate), end: new Date(cfg.endDate)})) {
-      days.push(this.buildDay(date));
+    for(const m = moment(cfg.startDate); m.isSameOrBefore(cfg.endDate); m.add(1, 'days')) {
+      days.push(this.buildDay(m.format(saveDateFormat)));
     }
 
     return days;
