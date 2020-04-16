@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import moment from "moment";
 
 const PlanModel = mongoose.model('Plan');
-const displayDateFormat = 'MMM Do, YYYY(ddd)';
+const displayDateFormat = 'MMM Do, YYYY (ddd)';
 const saveDateFormat = 'YYYY-MM-DD';
 
 const PlanService = {
