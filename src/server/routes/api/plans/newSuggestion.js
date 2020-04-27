@@ -3,14 +3,14 @@ import PlanOverviewService from "../../../services/PlanOverviewService";
 const { Router } = require('express');
 
 /**
- * load a plan by id, for the plan overview
+ * get a new suggestion for a particular date and meal in a plan
  */
 module.exports = Router({mergeParams: true})
-  .post('/loadPlan', async (req, res, next) => {
+  .post('/newSuggestion', async (req, res, next) => {
 
     try {
 
-      const results = await PlanOverviewService.loadPlan(req.body.planId);
+      const results = await PlanOverviewService.newSuggestion(req.body.id, req.body.date, req.body.meal);
 
       return res.json(results);
 

@@ -1,11 +1,12 @@
 import axios from 'axios';
-import config from '../../config';
 import mongoose from 'mongoose';
 import moment from "moment";
 
+import config from '../../config';
+import DateUtils from "../utils/DateUtils";
+import YelpUtils from "../utils/YelpUtils";
+
 const PlanModel = mongoose.model('Plan');
-const displayDateFormat = 'MMM Do, YYYY (ddd)';
-const saveDateFormat = 'YYYY-MM-DD';
 
 const PlanService = {
 
@@ -23,79 +24,11 @@ const PlanService = {
       return {
         id: plan._id,
         location: plan.location,
-        startDate: moment(plan.startDate).utc().format(displayDateFormat),
-        endDate: moment(plan.endDate).utc().format(displayDateFormat),
+        startDate: DateUtils.formatForDisplay(plan.startDate),
+        endDate: DateUtils.formatForDisplay(plan.endDate),
         name: plan.name
       }
     });
-  },
-
-  /**
-   * Load restaurant details for a plan
-   */
-  async loadPlan(planId) {
-
-    let service = this,
-      gql = '{',
-      resultMap = {},
-      count = 0;
-
-    // load plan first
-    let plan = await PlanModel.findOne({
-      _id: planId
-    });
-
-    //loop to build gql
-    plan.days.forEach(function (day) {
-
-      resultMap[day.b] = `a${count++}`;
-      resultMap[day.l] = `a${count++}`;
-      resultMap[day.d] = `a${count++}`;
-
-      gql += `${resultMap[day.b]}: business(id:"${day.b}"){...bizInfo}\n${resultMap[day.l]}:business(id:"${day.l}"){...bizInfo}\n${resultMap[day.d]}:business(id:"${day.d}"){...bizInfo}\n`;
-    });
-
-    gql += '} fragment bizInfo on Business { name\nrating\ncategories { title }\nurl\nreview_count}';
-
-    //fetch results
-
-    const response = await axios.post(`https://api.yelp.com/v3/graphql`, gql,
-      {
-        headers: {
-          Authorization: `Bearer ${config.yelpApiKey}`,
-          'Content-Type': 'application/graphql'
-        }
-      });
-    const results = response.data.data;
-
-    //loop to set results
-    plan.days = plan.days.map(function(day) {
-
-      return {
-        date: moment(day.date).utc().format(displayDateFormat),
-        b: service.buildDayResult(results[resultMap[day.b]]),
-        l: service.buildDayResult(results[resultMap[day.l]]),
-        d: service.buildDayResult(results[resultMap[day.d]])
-      };
-
-    });
-
-    return plan;
-  },
-
-  /**
-   * processing/formatting of day data
-   * @param day
-   */
-  buildDayResult(day) {
-
-    return {
-      ...day,
-      categories: day.categories.reduce((result, cat)=>{
-        return `${result}${cat.title}, `;
-      }, '').slice(0,-2)
-    };
-
   },
 
   /**
@@ -135,9 +68,9 @@ const PlanService = {
     }
 
     //fetch possible restaurants
-    await this.getBreakfastOptions();
-    await this.getLunchOptions();
-    await this.getDinnerOptions();
+    await this._getBreakfastOptions();
+    await this._getLunchOptions();
+    await this._getDinnerOptions();
 
     //build new plan
     const planObj = {
@@ -148,7 +81,7 @@ const PlanService = {
       startDate: planConfig.startDate,
       endDate: planConfig.endDate,
       name: planConfig.name,
-      days:  this.buildDays()
+      days:  this._buildDays()
     };
 
     //persist new plan
@@ -170,13 +103,13 @@ const PlanService = {
   /**
    * build up entire days structure for a new plan
    */
-  buildDays() {
+  _buildDays() {
 
     let cfg = this.planConfig,
       days = [];
 
     for(const m = moment(cfg.startDate); m.isSameOrBefore(cfg.endDate); m.add(1, 'days')) {
-      days.push(this.buildDay(m.format(saveDateFormat)));
+      days.push(this._buildDay(DateUtils.formatForSave(m)));
     }
 
     return days;
@@ -186,84 +119,60 @@ const PlanService = {
    * build a single day for a new plan
    * @param date
    */
-  buildDay(date) {
+  _buildDay(date) {
 
     return {
       date: date,
-      b: this.selectBreakfast(),
-      l: this.selectLunch(),
-      d: this.selectDinner()
+      b: this._selectBreakfast(),
+      l: this._selectLunch(),
+      d: this._selectDinner()
     };
   },
 
-  selectBreakfast() {
+  _selectBreakfast() {
     return this.breakfastOptions.shift().id;
   },
-  selectLunch() {
+  _selectLunch() {
     return this.lunchOptions.shift().id;
   },
-  selectDinner() {
+  _selectDinner() {
     return this.dinnerOptions.shift().id;
   },
 
   /**
    * Fetch breakfast options for entire plan
    */
-  async getBreakfastOptions() {
+  async _getBreakfastOptions() {
 
-    const results = await axios.get('https://api.yelp.com/v3/businesses/search', {
-      params: {
-        term: 'breakfast restaurants',
-        longitude: this.locationCoords.lng,
-        latitude: this.locationCoords.lat,
-        radius: 5000, // about 3 mile radius
-        sort_by: 'rating'
-      },
-      headers: {
-        Authorization: `Bearer ${config.yelpApiKey}`
-      }
+    this.breakfastOptions = await YelpUtils.searchBusinesses({
+      term: 'breakfast restaurants',
+      longitude: this.locationCoords.lng,
+      latitude: this.locationCoords.lat
     });
-
-    this.breakfastOptions = results.data.businesses;
   },
 
   /**
    * Fetch lunch options for entire plan
    */
-  async getLunchOptions() {const results = await axios.get('https://api.yelp.com/v3/businesses/search', {
-    params: {
+  async _getLunchOptions() {
+
+    this.lunchOptions = await YelpUtils.searchBusinesses({
       term: 'lunch restaurants',
       longitude: this.locationCoords.lng,
-      latitude: this.locationCoords.lat,
-      radius: 5000, // about 3 mile radius
-      sort_by: 'rating'
-    },
-    headers: {
-      Authorization: `Bearer ${config.yelpApiKey}`
-    }
-  });
-
-    this.lunchOptions = results.data.businesses;
+      latitude: this.locationCoords.lat
+    });
   },
 
   /**
    * Fetch dinner options for entire plan
    */
-  async getDinnerOptions() {
-    const results = await axios.get('https://api.yelp.com/v3/businesses/search', {
-      params: {
+  async _getDinnerOptions() {
+
+    this.dinnerOptions = await YelpUtils.searchBusinesses({
         term: 'dinner restaurants',
         longitude: this.locationCoords.lng,
-        latitude: this.locationCoords.lat,
-        radius: 5000, // about 3 mile radius
-        sort_by: 'rating'
-      },
-      headers: {
-        Authorization: `Bearer ${config.yelpApiKey}`
-      }
+        latitude: this.locationCoords.lat
     });
-
-    this.dinnerOptions = results.data.businesses;
   }
 };
 

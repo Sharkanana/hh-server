@@ -13,6 +13,7 @@ const PlanSchema = new mongoose.Schema({
   startDate: Date,
   endDate: Date,
   name: String,
+  rejectedIds: [],
   days: {
     type: [{}],
     validate: {
