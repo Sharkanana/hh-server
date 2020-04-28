@@ -75,7 +75,7 @@ const PlanOverviewService = {
     }
 
     // load full data for suggestion and return
-    return this._buildDayResult(await YelpUtils.businessDetails(newSuggestion, 'name', 'rating', 'categories', 'url', 'review_count'));
+    return this._buildDayResult(await YelpUtils.businessDetails(newSuggestion, 'name', 'rating', 'price', 'categories', 'url', 'review_count'));
   },
 
   /**
@@ -103,7 +103,7 @@ const PlanOverviewService = {
       gql += `${resultMap[day.b]}: business(id:"${day.b}"){...bizInfo}\n${resultMap[day.l]}:business(id:"${day.l}"){...bizInfo}\n${resultMap[day.d]}:business(id:"${day.d}"){...bizInfo}\n`;
     });
 
-    gql += '} fragment bizInfo on Business { name\nrating\ncategories { title }\nurl\nreview_count}';
+    gql += '} fragment bizInfo on Business { name\nrating\nprice\ncategories { title }\nurl\nreview_count}';
 
     //fetch results
     const results = await YelpUtils.gqlSearch(gql);

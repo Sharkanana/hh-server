@@ -7,4 +7,4 @@
 
 ### Todos
 
-* add money designator to plan overview (needs new serverside data)
+* ui spinner!
